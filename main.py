@@ -7,18 +7,30 @@ seven answer reads, from the house's 10-minute snapshots in /input.
 Method
 ------
 1. Build each coin's log10 market-cap (in SOL) series from the marks.
-2. Estimate a per-coin drift (recent log-cap slope, shrunk toward the mean
-   drift of its venue/age group) and volatility (residual / return std).
-   Drift decays exponentially with time (curve coins fast, pool coins slow),
-   because a coin rising x1.8 per 10 minutes cannot sustain that for hours.
-3. Monte Carlo (fixed seed, deterministic): simulate every candidate coin's
-   log-cap at each answer read with the decayed drift and sqrt-time vol.
-4. Rank the simulated caps at each read; average the place frequencies and
-   the place-cap histograms over the seven reads. That gives honest
-   probabilities per coin per place and per size bin.
-5. Leave part of every place unnamed (coins born after the cut can take any
-   place, and only the unnamed share scores on them); the share is larger
-   when the answer reads start long after the history ends.
+2. Estimate a per-coin drift (recent log-cap slope, shrunk toward the
+   median drift of its venue/age group) and volatility (residual std,
+   also shrunk). Returns across a venue change are skipped: graduation
+   changes the cap formula, so the measured "return" across it is an
+   artifact, not a real move. Group stats use the median, so one
+   graduating coin cannot drag a whole group's drift.
+3. Drift decays exponentially with time (curve coins fast, pool coins
+   slow), because a coin rising x1.8 per 10 minutes cannot sustain that
+   for hours.
+4. Monte Carlo (fixed seed, deterministic): simulate every candidate
+   coin's log-cap at each answer read with the decayed drift and
+   sqrt-time volatility, rank the simulated caps, and average the place
+   frequencies over the seven reads. That gives honest probabilities per
+   coin per place.
+5. Sizes: each place's market-cap distribution is a normal in log10
+   around the k-th largest EXPECTED cap (drift only, no noise),
+   averaged over the reads. Monte Carlo order statistics are the wrong
+   centre: independent noise spreads the top coins apart, while the real
+   top 5 stay tight because new coins keep filling the gaps.
+6. Leave part of every place unnamed (coins born after the cut can take
+   any place, and only the unnamed share scores on them); the share is
+   larger when the answer reads start long after the history ends.
+   Tuned on backtests against the practice history: 0.35 for a 2+ hour
+   gap, 0.25 otherwise; size sd 0.35.
 
 Reads /input/task.json (places, size bins, answer reads) and
 /input/history.ndjson. Writes /output/forecast.json.
@@ -36,10 +48,15 @@ INPUT_DIR = os.environ.get("MAKEFUN_INPUT_DIR", "/input")
 OUTPUT_DIR = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
 
 SEED = 20261112
+# 4000 sims: ~5 s on the practice history, far inside the 300 s limit;
+# the final's 66-mark history costs about the same (the sim count, not
+# the history length, dominates the runtime).
 N_SIMS = 4000
 MAX_CANDIDATES = 260
 MAX_ROWS_PER_PLACE = 100
-MIN_KEEP_P = 0.0005          # drop named rows below this
+MIN_KEEP_P = 0.0005          # drop named rows below this; a dropped coin
+                              # falls back to its place's unnamed share,
+                              # which is usually worth more than 0.0005
 MIN_KEEP_BIN_P = 0.002       # drop size bins below this
 SIZE_SD = 0.35               # sd of a place's log10 cap around its expected cap
 MICRO = 1_000_000
@@ -192,10 +209,8 @@ def main():
 
     rng = random.Random(SEED)
     n = len(candidates)
-    # place counts: place -> {mint: count}; place-cap sums: place -> (sum, sumsq)
+    # place counts: place -> {mint: count}
     place_counts = [defaultdict(int) for _ in range(places)]
-    place_cap_sum = [0.0] * places
-    place_cap_sq = [0.0] * places
     total_sims = N_SIMS * len(reads)
 
     for _ in range(N_SIMS):
@@ -217,8 +232,6 @@ def main():
             for p in range(places):
                 mint = candidates[caps[p][1]]
                 place_counts[p][mint] += 1
-                place_cap_sum[p] += caps[p][0]
-                place_cap_sq[p] += caps[p][0] * caps[p][0]
 
     probabilities = []
     for p in range(places):

@@ -35,6 +35,16 @@ forecast to `/output/forecast.json`.
    2+ hours): coins born after the cut can take any place, and only the
    unnamed share scores on them.
 
+## Tuning
+
+The unnamed share and the size sd were tuned on backtests against the
+practice history (truncate the history at a cut mark, score the forecast
+on the marks after the cut, compare with the house baseline). Two lessons
+from those backtests are baked into the code: the baseline's fat unnamed
+share (0.50) beats a thin one whenever the winners are mostly coins the
+model cannot see, and the size centre must come from expected caps, not
+from Monte Carlo order statistics.
+
 ## Run it
 
 ```sh
