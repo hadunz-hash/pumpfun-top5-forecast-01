@@ -63,26 +63,27 @@ the resubmission with sd 0.20 scored -42.8920 — the practice reads
 sit hours after the cut, where the centres carry real error and
 newborns dominate the top places, so a tight band floors the size
 terms. Widening helped up to a point: sd 0.50 scored -39.5769, the
-best so far, while sd 0.65 scored -39.8798 — slightly worse, so the
-practice optimum sits near 0.50–0.60. The shipped sd is now 0.575,
-the midpoint probe; the final's 7–13 hour gap is longer than the
-practice's, which is the only reason to lean a touch wider than the
-practice's exact peak.
+best so far, while sd 0.65 scored -39.8798 and sd 0.575 scored
+-39.6733 — both slightly worse, so the practice optimum sits at
+0.50. The shipped sd is 0.50, the practice-best version; the final's
+7–13 hour gap is longer than the practice's, but the measured curve
+is flat near the peak (0.50 vs 0.65 differ by only 0.30), so chasing
+a wider sd on a horizon argument alone is not worth giving up the
+best measured score.
 
 Caveats: the backtests truncate a 6-mark practice history, so their
 horizons are minutes, not the final's 7–13 hours, and the final regime
 (66 marks, most winners unseen at the cut) is not representable by them.
-The shipped defaults (unnamed 0.35 for a 2+ hour gap, size sd 0.575) are
+The shipped defaults (unnamed 0.35 for a 2+ hour gap, size sd 0.50) are
 chosen for that long-gap regime, where the unseen-coins share dominates
 and the size centres carry more error.
 The server's practice score on the submitted entry is the real validation:
 the house baseline scores -40.408345 on the practice (order -21.380389,
 size -19.027956), and an even-spread forecast scores -45.059447. Practice
 scores by size sd: 0.20 → -42.8920 (rank 575), 0.35 → -40.3628
-(rank 495), 0.50 → -39.5769 (rank 501), 0.65 → -39.8798 — the peak
-sits near 0.50–0.60, and 0.575 is the midpoint probe. The final is
-judged on the latest submission, so if 0.575 scores worse than 0.50,
-the entry reverts to the 0.50 version.
+(rank 495), 0.50 → -39.5769 (rank 501), 0.575 → -39.6733 (rank 514),
+0.65 → -39.8798 — the peak is at 0.50, and that is the version
+shipped as the final entry.
 
 ## Practice forecast
 
