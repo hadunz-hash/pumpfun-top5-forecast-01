@@ -57,22 +57,29 @@ The size sd keeps shrinking the score the tighter it gets on these
 short-horizon backtests (0.35 → -32.880 / -32.008, 0.25 → -31.378 /
 -30.481, 0.20 → -30.465 / -29.543, 0.15 → -29.460 / -28.486 at
 cuts 4 / 5), because the expected-cap centres are accurate over
-10–20 minutes. The shipped sd is 0.20, not 0.15: the final's centres
-are drift-only extrapolations 7–13 hours out, so they carry more error
-and need a wider band than the backtests' short horizons suggest.
+10–20 minutes. But the server's practice score punished the tight sd:
+the first submission (size sd 0.35) scored -40.3628 on the dev phase,
+while the resubmission with sd 0.20 scored -42.8920 — the practice
+reads sit hours after the cut, where the centres carry real error and
+newborns dominate the top places, so a tight band floors the size
+terms. The shipped sd is now 0.50, a probe in the other direction: the
+practice score is the only validation that sees the long-gap regime,
+and the final's 7–13 hour gap is longer still.
 
 Caveats: the backtests truncate a 6-mark practice history, so their
 horizons are minutes, not the final's 7–13 hours, and the final regime
 (66 marks, most winners unseen at the cut) is not representable by them.
-The shipped defaults (unnamed 0.35 for a 2+ hour gap, size sd 0.20) are
+The shipped defaults (unnamed 0.35 for a 2+ hour gap, size sd 0.50) are
 chosen for that long-gap regime, where the unseen-coins share dominates
 and the size centres carry more error.
 The server's practice score on the submitted entry is the real validation:
 the house baseline scores -40.408345 on the practice (order -21.380389,
 size -19.027956), and an even-spread forecast scores -45.059447. The
 first submission (size sd 0.35) scored -40.3628 on the dev phase
-(rank 495) — barely above the baseline, which is what motivated
-tightening the size sd to 0.20.
+(rank 495); the second (size sd 0.20) scored -42.8920 (rank 575) —
+worse, which is what motivated widening the size sd to 0.50 for the
+third submission. The final is judged on the latest submission, so a
+worse probe is always reversible by resubmitting the 0.35 version.
 
 ## Practice forecast
 

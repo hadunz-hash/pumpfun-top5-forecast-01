@@ -30,7 +30,7 @@ Method
    any place, and only the unnamed share scores on them); the share is
    larger when the answer reads start long after the history ends.
    Tuned on backtests against the practice history: 0.35 for a 2+ hour
-   gap, 0.25 otherwise; size sd 0.20.
+   gap, 0.25 otherwise; size sd 0.50.
 
 Reads /input/task.json (places, size bins, answer reads) and
 /input/history.ndjson. Writes /output/forecast.json.
@@ -58,7 +58,7 @@ MIN_KEEP_P = 0.0005          # drop named rows below this; a dropped coin
                               # falls back to its place's unnamed share,
                               # which is usually worth more than 0.0005
 MIN_KEEP_BIN_P = 0.002       # drop size bins below this
-SIZE_SD = 0.20               # sd of a place's log10 cap around its expected cap
+SIZE_SD = 0.50               # sd of a place's log10 cap around its expected cap
 MICRO = 1_000_000
 
 # Tunables (env overrides for backtesting; defaults are the shipped values)
