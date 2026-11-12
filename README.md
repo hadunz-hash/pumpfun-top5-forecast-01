@@ -50,17 +50,29 @@ from Monte Carlo order statistics.
 | cut | house baseline | this entry (best) | best settings |
 |-----|----------------|-------------------|---------------|
 | 3   | -49.958        | -50.4             | — (history too short: winners mostly newborns) |
-| 4   | -33.478        | -31.378           | unnamed 0.25, size sd 0.25 |
-| 5   | -29.867        | -28.595           | unnamed 0.25, size sd 0.35 |
+| 4   | -33.478        | -29.460           | unnamed 0.25, size sd 0.15 |
+| 5   | -29.867        | -28.486           | unnamed 0.25, size sd 0.15 |
+
+The size sd keeps shrinking the score the tighter it gets on these
+short-horizon backtests (0.35 → -32.880 / -32.008, 0.25 → -31.378 /
+-30.481, 0.20 → -30.465 / -29.543, 0.15 → -29.460 / -28.486 at
+cuts 4 / 5), because the expected-cap centres are accurate over
+10–20 minutes. The shipped sd is 0.20, not 0.15: the final's centres
+are drift-only extrapolations 7–13 hours out, so they carry more error
+and need a wider band than the backtests' short horizons suggest.
 
 Caveats: the backtests truncate a 6-mark practice history, so their
 horizons are minutes, not the final's 7–13 hours, and the final regime
 (66 marks, most winners unseen at the cut) is not representable by them.
-The shipped defaults (unnamed 0.35 for a 2+ hour gap, size sd 0.35) are
-chosen for that long-gap regime, where the unseen-coins share dominates.
+The shipped defaults (unnamed 0.35 for a 2+ hour gap, size sd 0.20) are
+chosen for that long-gap regime, where the unseen-coins share dominates
+and the size centres carry more error.
 The server's practice score on the submitted entry is the real validation:
 the house baseline scores -40.408345 on the practice (order -21.380389,
-size -19.027956), and an even-spread forecast scores -45.059447.
+size -19.027956), and an even-spread forecast scores -45.059447. The
+first submission (size sd 0.35) scored -40.3628 on the dev phase
+(rank 495) — barely above the baseline, which is what motivated
+tightening the size sd to 0.20.
 
 ## Practice forecast
 
