@@ -1,0 +1,50 @@
+# Pump.fun top-5 forecast
+
+Entry for make.fun's `pumpfun-top5-forecast-01`: predict the 5 largest
+pump.fun coins by market cap at each of the house's seven answer reads.
+
+## How it works
+
+`main.py` (Python 3.13, standard library only) reads the house's 10-minute
+snapshots from `/input` (`history.ndjson`, `task.json`) and writes one
+forecast to `/output/forecast.json`.
+
+1. **Series.** For every coin it builds a log10 market-cap (in SOL) series
+   from the marks, with venue (`curve` / `pool` / `migrating`) and age.
+2. **Drift and volatility.** A per-coin drift (recent log-cap slope, shrunk
+   toward the median drift of its venue/age group) and volatility
+   (residual std, also shrunk). Returns across a venue change are skipped:
+   graduation changes the cap formula, so the measured "return" across it
+   is an artifact, not a real move. Group stats use the median, so one
+   graduating coin cannot drag a whole group's drift.
+3. **Drift decay.** Drift decays exponentially with time (curve coins fast,
+   pool coins slow): a coin rising x1.8 per 10 minutes cannot sustain that
+   for hours.
+4. **Monte Carlo.** With a fixed seed, it simulates every candidate coin's
+   log-cap at each answer read (drift decayed, volatility growing as
+   sqrt-time), ranks the simulated caps, and averages the place
+   frequencies over the seven reads. That gives honest probabilities per
+   coin per place.
+5. **Sizes.** Each place's market-cap distribution is a normal in log10
+   around the k-th largest *expected* cap (drift only, no noise),
+   averaged over the reads. Monte Carlo order statistics are the wrong
+   centre: independent noise spreads the top coins apart, while the real
+   top 5 stay tight because new coins keep filling the gaps.
+6. **Newcomers.** Part of every place is left unnamed (0.25 when the
+   answer reads start soon after the history ends, 0.35 when the gap is
+   2+ hours): coins born after the cut can take any place, and only the
+   unnamed share scores on them.
+
+## Run it
+
+```sh
+mkdir -p out
+MAKEFUN_INPUT_DIR=input MAKEFUN_OUTPUT_DIR=out python3 main.py
+```
+
+Deterministic: two runs on the same history produce byte-identical output.
+Runs in ~5 seconds on the practice history.
+
+## License
+
+MIT. See `LICENSE`.
