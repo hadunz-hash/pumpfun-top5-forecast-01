@@ -45,6 +45,30 @@ share (0.50) beats a thin one whenever the winners are mostly coins the
 model cannot see, and the size centre must come from expected caps, not
 from Monte Carlo order statistics.
 
+### Backtest results (local scorer, log score — higher is better)
+
+| cut | house baseline | this entry (best) | best settings |
+|-----|----------------|-------------------|---------------|
+| 3   | -49.958        | -50.4             | — (history too short: winners mostly newborns) |
+| 4   | -33.478        | -31.378           | unnamed 0.25, size sd 0.25 |
+| 5   | -29.867        | -28.595           | unnamed 0.25, size sd 0.35 |
+
+Caveats: the backtests truncate a 6-mark practice history, so their
+horizons are minutes, not the final's 7–13 hours, and the final regime
+(66 marks, most winners unseen at the cut) is not representable by them.
+The shipped defaults (unnamed 0.35 for a 2+ hour gap, size sd 0.35) are
+chosen for that long-gap regime, where the unseen-coins share dominates.
+The server's practice score on the submitted entry is the real validation:
+the house baseline scores -40.408345 on the practice (order -21.380389,
+size -19.027956), and an even-spread forecast scores -45.059447.
+
+## Practice forecast
+
+On the full practice history the entry's top 5 is: Ansem is Back
+(`7fNYfFkDefatZugpcgaHqGxQuwm6JzcRYDQrdajqpump`), MIHAO VI (`4Dgj...`),
+Solar Elon (`Ghjt...`), `CKSX...`, `HErn...`. Place-1 probabilities:
+Ansem is Back 0.271, Solar Elon 0.181, MIHAO VI 0.172.
+
 ## Run it
 
 ```sh

@@ -15,7 +15,7 @@ Method
    graduating coin cannot drag a whole group's drift.
 3. Drift decays exponentially with time (curve coins fast, pool coins
    slow), because a coin rising x1.8 per 10 minutes cannot sustain that
-   for hours.
+   for hours. The decayed drift over a horizon is drift_total().
 4. Monte Carlo (fixed seed, deterministic): simulate every candidate
    coin's log-cap at each answer read with the decayed drift and
    sqrt-time volatility, rank the simulated caps, and average the place
@@ -74,6 +74,74 @@ def parse_time(s):
 
 def log10_sol(market_cap_lamports):
     return math.log10(int(market_cap_lamports)) - 9.0
+
+
+def age_bucket(age_min):
+    if age_min < 60:
+        return 0
+    if age_min < 180:
+        return 1
+    return 2
+
+
+def above(x, mean, sd):
+    """P(X >= x) for X normal with mean `mean` and sd `sd`."""
+    if x == -math.inf:
+        return 1.0
+    if x == math.inf:
+        return 0.0
+    return 0.5 * math.erfc((x - mean) / (sd * math.sqrt(2.0)))
+
+
+def drift_total(mu, minutes, tau):
+    """Drift accumulated over `minutes` when the per-10-min drift `mu`
+    decays exponentially with time constant `tau` (minutes):
+    integral of mu*exp(-t/tau) dt, in units of 10-minute steps."""
+    return mu * (tau / 10.0) * (1.0 - math.exp(-minutes / tau))
+
+
+def estimate_stats(mint, pts, coin_returns, group_mu, group_sd, all_mu, t0):
+    """Per-coin (drift per 10 min, vol per 10 min, venue, last log-cap).
+
+    Drift and vol are the coin's own recent returns, shrunk toward its
+    venue/age group's robust stats. A coin with no usable returns just
+    takes the group stats. Young curve coins that just appeared tend to
+    keep rising briefly; old coins that stopped moving tend to keep
+    fading -- both are already in the group's median, so no extra term.
+    """
+    venue = pts[-1][2] if pts else "curve"
+    age_min = (t0 + pts[-1][0] * 60.0 - pts[-1][4]) / 60.0 if pts else 0.0
+    g = (venue, age_bucket(age_min))
+    gmu = group_mu.get(g, all_mu)
+    gsd = group_sd.get(g, 0.15)
+    rets = coin_returns.get(mint, [])
+    if len(rets) >= 2:
+        mu = sum(rets) / len(rets)
+        var = sum((v - mu) ** 2 for v in rets) / (len(rets) - 1)
+        sd = math.sqrt(var) if var > 0 else gsd
+        w = len(rets) / (len(rets) + 3.0)  # shrink toward group mean
+        mu = w * mu + (1 - w) * gmu
+        sd = w * sd + (1 - w) * gsd        # shrink vol toward group vol
+        sd = min(max(sd, 0.03), 0.30)
+    elif len(rets) == 1:
+        mu = 0.5 * rets[0] + 0.5 * gmu
+        sd = gsd
+    else:
+        mu = gmu
+        sd = gsd
+    return (mu, sd, venue, pts[-1][1] if pts else 2.0)
+
+
+def expected_caps(candidates, stats, horizon_min):
+    """Expected log10 caps of every candidate at `horizon_min` minutes
+    from the last mark (drift only, no noise), largest first."""
+    exps = []
+    for mint in candidates:
+        mu, sd, venue, x0 = stats[mint]
+        tau = 300.0 if venue == "pool" else 120.0
+        exps.append(x0 + drift_total(mu, horizon_min, tau))
+    exps.sort(reverse=True)
+    return exps
 
 
 def main():
@@ -170,30 +238,9 @@ def main():
     # ---- per-coin drift (per 10 min) and vol (per 10 min), shrunk to group
     stats = {}
     for mint in candidates:
-        pts = series.get(mint, [])
-        venue = pts[-1][2] if pts else "curve"
-        age_min = (t0 + pts[-1][0] * 60.0 - pts[-1][4]) / 60.0 if pts else 0.0
-        g = (venue, age_bucket(age_min))
-        gmu = group_mu.get(g, all_mu)
-        gsd = group_sd.get(g, 0.15)
-        rets = coin_returns.get(mint, [])
-        if len(rets) >= 2:
-            mu = sum(rets) / len(rets)
-            var = sum((v - mu) ** 2 for v in rets) / (len(rets) - 1)
-            sd = math.sqrt(var) if var > 0 else gsd
-            w = len(rets) / (len(rets) + 3.0)  # shrink toward group mean
-            mu = w * mu + (1 - w) * gmu
-            sd = w * sd + (1 - w) * gsd        # shrink vol toward group vol
-            sd = min(max(sd, 0.03), 0.30)
-        elif len(rets) == 1:
-            mu = 0.5 * rets[0] + 0.5 * gmu
-            sd = gsd
-        else:
-            mu = gmu
-            sd = gsd
-        # young curve coins that just appeared tend to keep rising briefly;
-        # old coins that stopped moving tend to keep fading.
-        stats[mint] = (mu, sd, venue, pts[-1][1] if pts else 2.0)
+        stats[mint] = estimate_stats(mint, series.get(mint, []),
+                                      coin_returns, group_mu, group_sd,
+                                      all_mu, t0)
 
     # ---- horizons: minutes from the last mark to each answer read
     horizons = [max(10.0, (rt - last_at) / 60.0) for rt in reads]
@@ -223,10 +270,7 @@ def main():
             for i, mint in enumerate(candidates):
                 mu, sd, venue, x0 = stats[mint]
                 tau = 300.0 if venue == "pool" else 120.0
-                # drift decays: integral of mu*exp(-t/tau) over h minutes,
-                # in units of 10-minute steps
-                drift_total = mu * (tau / 10.0) * (1.0 - math.exp(-h / tau))
-                x = x0 + drift_total + sd * math.sqrt(steps) * zs[i]
+                x = x0 + drift_total(mu, h, tau) + sd * math.sqrt(steps) * zs[i]
                 caps.append((x, i))
             caps.sort(reverse=True)
             for p in range(places):
@@ -279,13 +323,7 @@ def main():
     size_sd = float(SIZE_SD_ENV) if SIZE_SD_ENV is not None else SIZE_SD
     centers = [0.0] * places
     for h in horizons:
-        exps = []
-        for mint in candidates:
-            mu, sd, venue, x0 = stats[mint]
-            tau = 300.0 if venue == "pool" else 120.0
-            drift_total = mu * (tau / 10.0) * (1.0 - math.exp(-h / tau))
-            exps.append(x0 + drift_total)
-        exps.sort(reverse=True)
+        exps = expected_caps(candidates, stats, h)
         for p in range(places):
             centers[p] += exps[p] / len(horizons)
     sizes = []
@@ -303,23 +341,6 @@ def main():
     with open(os.path.join(OUTPUT_DIR, output_name), "w") as f:
         f.write(json.dumps({"probabilities": probabilities, "top5": top5,
                             "sizes": sizes}) + "\n")
-
-
-def age_bucket(age_min):
-    if age_min < 60:
-        return 0
-    if age_min < 180:
-        return 1
-    return 2
-
-
-def above(x, mean, sd):
-    """P(X >= x) for X normal with mean `mean` and sd `sd`."""
-    if x == -math.inf:
-        return 1.0
-    if x == math.inf:
-        return 0.0
-    return 0.5 * math.erfc((x - mean) / (sd * math.sqrt(2.0)))
 
 
 if __name__ == "__main__":
